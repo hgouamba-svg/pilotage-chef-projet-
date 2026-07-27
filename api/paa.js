@@ -1,17 +1,22 @@
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 const KEY = "paa-history";
 
 export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
-      const data = (await kv.get(KEY)) || [];
+      const data = (await redis.get(KEY)) || [];
       return res.status(200).json(data);
     }
 
     if (req.method === "POST") {
       const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-      await kv.set(KEY, body);
+      await redis.set(KEY, body);
       return res.status(200).json({ ok: true });
     }
 
