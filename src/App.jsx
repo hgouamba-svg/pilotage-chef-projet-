@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { PhoneCall, TrendingUp, CheckCircle2, AlertTriangle, Copy, Trash2, Sparkles, ChevronRight, Download } from "lucide-react";
+import { PhoneCall, TrendingUp, CheckCircle2, AlertTriangle, Copy, Trash2, Sparkles, ChevronRight, Download, ClipboardList } from "lucide-react";
 
 // ---- Palette (aligned with the "Piloter une activité de 50 ETP" deck) ----
 const NAVY = "#173A6B";
@@ -7,6 +7,45 @@ const VIOLET = "#3D2170";
 const YELLOW = "#F0C230";
 const SKY = "#5570A8";
 const PAPER = "#FBFCFE";
+
+const DISC_CAUSES = {
+  retards: {
+    label: "Retards répétés",
+    outil: "Entretien sur les causes réelles (transport, organisation personnelle) avant tout aménagement d'horaire.",
+    actions: [
+      "Entretien individuel pour identifier la cause réelle, pas seulement constater le fait.",
+      "Aménagement d'horaire à l'essai si la cause est structurelle (transport, contraintes familiales).",
+      "Suivi hebdomadaire de ponctualité, partagé avec le conseiller, pas seulement archivé.",
+    ],
+  },
+  absenteisme: {
+    label: "Absentéisme",
+    outil: "Entretien de retour systématique, pour comprendre avant de sanctionner.",
+    actions: [
+      "Entretien de retour à chaque absence, même courte, pour maintenir le lien.",
+      "Plan de présence coconstruit si les absences deviennent récurrentes.",
+      "Orientation vers les ressources internes (RH, médecine du travail) si signal de mal-être.",
+    ],
+  },
+  qualite: {
+    label: "Manquement qualité / procédure",
+    outil: "Formation flash ciblée et binôme avec un référent qualité — la même logique que la DMT et le commerce.",
+    actions: [
+      "Diagnostic par écoute : erreur de compétence ou erreur d'application ponctuelle ?",
+      "Formation flash ciblée sur le point précis en écart, pas une reprise générale.",
+      "Binôme avec un référent qualité/formation pendant 2 à 3 semaines.",
+    ],
+  },
+  posture: {
+    label: "Posture / comportement",
+    outil: "Recadrage individuel suivi d'un coaching de posture avec le superviseur.",
+    actions: [
+      "Recadrage factuel et individuel, sur des faits précis, jamais en public.",
+      "Coaching de posture avec le superviseur : objectifs de comportement observables et datés.",
+      "Point de suivi à mi-échéance pour ajuster avant l'échéance finale.",
+    ],
+  },
+};
 
 const DMT_CAUSES = {
   conversation: {
@@ -195,10 +234,36 @@ function buildCommerce(nom, actuel, cible, causeKey) {
   };
 }
 
+function buildDisc(nom, causeKey, mesureFormelle) {
+  const cause = DISC_CAUSES[causeKey];
+  const dateEcheance = addWeeks(3);
+  return {
+    id: uid(),
+    theme: "disc",
+    nom,
+    createdAt: new Date().toISOString(),
+    status: "en cours",
+    causeLabel: cause.label,
+    mesureFormelle: mesureFormelle || "Aucune",
+    indicateurEcart: `Manquement constaté : ${cause.label.toLowerCase()}.${mesureFormelle && mesureFormelle !== "Aucune" ? ` Mesure formelle associée : ${mesureFormelle}.` : " Pas de mesure formelle à ce stade — traité en développement."}`,
+    actionsFactuelles: cause.actions,
+    commentaire: `${cause.outil} L'objectif n'est pas d'archiver un écart, c'est de le transformer en progression mesurable.`,
+    suiviSmart: `Spécifique : résorber la cause « ${cause.label.toLowerCase()} » via les actions ci-dessus. Mesurable : point de suivi formalisé. Atteignable : action proportionnée à la cause réelle, pas au symptôme. Réaliste : échéance courte pour ne pas laisser le sujet dériver. Temporel : échéance de suivi au ${dateEcheance}.`,
+    felicitation: "Écart résorbé : point positif tracé dans le même historique que le manquement — la progression est aussi visible que l'écart l'a été.",
+  };
+}
+
+function themeLabel(theme) {
+  if (theme === "dmt") return "Maîtrise de la DMT";
+  if (theme === "commerce") return "Développement commercial";
+  if (theme === "disc") return "Registre disciplinaire orienté solution";
+  return theme;
+}
+
 function paaToText(p) {
   return [
     `PLAN D'ACCOMPAGNEMENT — ${p.nom}`,
-    `Thème : ${p.theme === "dmt" ? "Maîtrise de la DMT" : "Développement commercial"}`,
+    `Thème : ${themeLabel(p.theme)}`,
     "",
     `INDICATEUR ÉCART`,
     p.indicateurEcart,
@@ -226,7 +291,8 @@ function Field({ label, children }) {
 }
 
 const inputCls =
-  "w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 transition";
+  "w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 transition bg-white";
+const selectCls = inputCls + " cursor-pointer";
 
 export default function AssistantConseillers() {
   const [tab, setTab] = useState("dmt");
@@ -247,6 +313,11 @@ export default function AssistantConseillers() {
   const [comActuel, setComActuel] = useState("");
   const [comCible, setComCible] = useState("20");
   const [comCause, setComCause] = useState("proposition");
+
+  // Disciplinary register form state
+  const [discNom, setDiscNom] = useState("");
+  const [discCause, setDiscCause] = useState("retards");
+  const [discMesure, setDiscMesure] = useState("Aucune");
 
   const [syncError, setSyncError] = useState(false);
 
@@ -344,6 +415,19 @@ export default function AssistantConseillers() {
     showToast("PAA généré et enregistré.");
   }
 
+  function handleDiscSubmit(e) {
+    e.preventDefault();
+    if (!discNom.trim()) {
+      showToast("Renseigne le nom du conseiller.");
+      return;
+    }
+    const entry = buildDisc(discNom.trim(), discCause, discMesure);
+    persist([entry, ...history]);
+    setDiscNom("");
+    setDiscMesure("Aucune");
+    showToast("Plan de développement généré et enregistré.");
+  }
+
   function markAtteint(id) {
     const next = history.map((p) =>
       p.id === id ? { ...p, status: "atteint", atteintAt: new Date().toISOString() } : p
@@ -378,7 +462,7 @@ export default function AssistantConseillers() {
         : "";
       return [
         p.nom,
-        p.theme === "dmt" ? "Maîtrise DMT" : "Développement commercial",
+        themeLabel(p.theme),
         p.causeLabel || "",
         created.toLocaleDateString("fr-FR"),
         p.metricLabel,
@@ -427,7 +511,7 @@ export default function AssistantConseillers() {
     }
   }
 
-  const causes = tab === "dmt" ? DMT_CAUSES : COM_CAUSES;
+  const causes = tab === "dmt" ? DMT_CAUSES : tab === "commerce" ? COM_CAUSES : DISC_CAUSES;
 
   return (
     <div className="min-h-screen" style={{ background: PAPER, fontFamily: "Arial, sans-serif" }}>
@@ -499,6 +583,17 @@ export default function AssistantConseillers() {
           >
             <TrendingUp size={16} /> Développement commercial
           </button>
+          <button
+            onClick={() => setTab("disc")}
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition"
+            style={{
+              background: tab === "disc" ? VIOLET : "white",
+              color: tab === "disc" ? "white" : VIOLET,
+              border: `1px solid ${VIOLET}`,
+            }}
+          >
+            <ClipboardList size={16} /> Registre disciplinaire
+          </button>
         </div>
 
         {/* Form card */}
@@ -516,7 +611,7 @@ export default function AssistantConseillers() {
               </Field>
               <Field label="Cause principale">
                 <select
-                  className={inputCls}
+                  className={selectCls}
                   style={{ borderColor: "#D8E0F0" }}
                   value={dmtCause}
                   onChange={(e) => setDmtCause(e.target.value)}
@@ -557,7 +652,7 @@ export default function AssistantConseillers() {
                 </button>
               </div>
             </form>
-          ) : (
+          ) : tab === "commerce" ? (
             <form onSubmit={handleComSubmit} className="grid sm:grid-cols-2 gap-4">
               <Field label="Conseiller">
                 <input
@@ -570,7 +665,7 @@ export default function AssistantConseillers() {
               </Field>
               <Field label="Cause principale">
                 <select
-                  className={inputCls}
+                  className={selectCls}
                   style={{ borderColor: "#D8E0F0" }}
                   value={comCause}
                   onChange={(e) => setComCause(e.target.value)}
@@ -611,25 +706,91 @@ export default function AssistantConseillers() {
                 </button>
               </div>
             </form>
+          ) : (
+            <form onSubmit={handleDiscSubmit} className="grid sm:grid-cols-2 gap-4">
+              <Field label="Conseiller">
+                <input
+                  className={inputCls}
+                  style={{ borderColor: "#D8E0F0" }}
+                  placeholder="Nom du conseiller"
+                  value={discNom}
+                  onChange={(e) => setDiscNom(e.target.value)}
+                />
+              </Field>
+              <Field label="Type de manquement">
+                <select
+                  className={selectCls}
+                  style={{ borderColor: "#D8E0F0" }}
+                  value={discCause}
+                  onChange={(e) => setDiscCause(e.target.value)}
+                >
+                  {Object.entries(DISC_CAUSES).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Mesure formelle (si nécessaire)">
+                <select
+                  className={selectCls}
+                  style={{ borderColor: "#D8E0F0" }}
+                  value={discMesure}
+                  onChange={(e) => setDiscMesure(e.target.value)}
+                >
+                  <option value="Aucune">Aucune — traité en développement</option>
+                  <option value="Avertissement oral">Avertissement oral</option>
+                  <option value="Avertissement écrit">Avertissement écrit</option>
+                </select>
+              </Field>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold text-white transition hover:opacity-90"
+                  style={{ background: VIOLET }}
+                >
+                  <Sparkles size={16} /> Générer le plan de développement
+                </button>
+              </div>
+            </form>
           )}
         </div>
 
         {/* Cause bank preview */}
         <div className="mb-8">
           <h2 className="text-xs font-semibold tracking-wide uppercase mb-2" style={{ color: SKY }}>
-            Banque de techniques — {tab === "dmt" ? "DMT" : "Commerce"}
+            Banque de techniques — {tab === "dmt" ? "DMT" : tab === "commerce" ? "Commerce" : "Registre disciplinaire"}
           </h2>
+          <p className="text-xs mb-2" style={{ color: SKY }}>
+            Clique une carte pour sélectionner cette cause dans le formulaire ci-dessus.
+          </p>
           <div className="grid sm:grid-cols-3 gap-3">
-            {Object.entries(causes).map(([k, v]) => (
-              <div key={k} className="rounded-lg border p-3 bg-white" style={{ borderColor: "#E2E8F5" }}>
-                <div className="text-sm font-semibold mb-1" style={{ color: NAVY }}>
-                  {v.label}
-                </div>
-                <div className="text-xs" style={{ color: SKY }}>
-                  {v.outil}
-                </div>
-              </div>
-            ))}
+            {Object.entries(causes).map(([k, v]) => {
+              const active = tab === "dmt" ? dmtCause === k : tab === "commerce" ? comCause === k : discCause === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() =>
+                    tab === "dmt" ? setDmtCause(k) : tab === "commerce" ? setComCause(k) : setDiscCause(k)
+                  }
+                  className="text-left rounded-lg border p-3 bg-white transition hover:shadow-md cursor-pointer"
+                  style={{
+                    borderColor: active ? VIOLET : "#E2E8F5",
+                    borderWidth: active ? 2 : 1,
+                    background: active ? "#F5F2FB" : "white",
+                  }}
+                >
+                  <div className="text-sm font-semibold mb-1 flex items-center gap-1.5" style={{ color: NAVY }}>
+                    {active && <CheckCircle2 size={14} color={VIOLET} />}
+                    {v.label}
+                  </div>
+                  <div className="text-xs" style={{ color: SKY }}>
+                    {v.outil}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -818,7 +979,9 @@ export default function AssistantConseillers() {
                       {p.nom}
                     </span>
                     <span className="text-xs" style={{ color: SKY }}>
-                      · {p.metricLabel} {p.actuel} → cible {p.cible}
+                      {p.theme === "disc"
+                        ? `· ${p.causeLabel} — ${p.mesureFormelle}`
+                        : `· ${p.metricLabel} ${p.actuel} → cible ${p.cible}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
