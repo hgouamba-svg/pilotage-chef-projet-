@@ -616,8 +616,8 @@ export default function AssistantConseillers() {
             </div>
           </div>
           <p className="text-sm mt-2 max-w-2xl" style={{ color: "#B9C6E0" }}>
-            En cas d'écart sur la DMT ou le commerce, l'outil diagnostique la cause et génère un
-            PAA factuel centré sur la montée en compétences — jamais la sanction.
+            Sur la DMT, le commerce, le disciplinaire ou la fidélisation, l'outil diagnostique la
+            cause et génère un plan factuel centré sur la montée en compétences, jamais la sanction.
           </p>
         </div>
       </div>
