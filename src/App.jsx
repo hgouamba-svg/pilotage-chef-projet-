@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { PhoneCall, TrendingUp, CheckCircle2, AlertTriangle, Copy, Trash2, Sparkles, ChevronRight, Download, ClipboardList } from "lucide-react";
+import { PhoneCall, TrendingUp, CheckCircle2, AlertTriangle, Copy, Trash2, Sparkles, ChevronRight, Download, ClipboardList, Heart } from "lucide-react";
 
 // ---- Palette (aligned with the "Piloter une activité de 50 ETP" deck) ----
 const NAVY = "#173A6B";
@@ -7,6 +7,45 @@ const VIOLET = "#3D2170";
 const YELLOW = "#F0C230";
 const SKY = "#5570A8";
 const PAPER = "#FBFCFE";
+
+const FID_CAUSES = {
+  onboarding: {
+    label: "Manque d'accompagnement initial",
+    outil: "Parcours d'intégration formalisé J1-J30, pas une simple formation d'accueil.",
+    actions: [
+      "Programme d'intégration structuré sur 30 jours, avec jalons explicites.",
+      "Binôme ou parrain dédié dès le premier jour, pas seulement en cas de difficulté.",
+      "Point à J7 pour lever les premières incompréhensions avant qu'elles ne s'installent.",
+    ],
+  },
+  isolement: {
+    label: "Isolement / pas de lien d'équipe",
+    outil: "Rituels d'équipe qui incluent systématiquement les nouveaux arrivants.",
+    actions: [
+      "Inclusion immédiate dans les rituels d'équipe existants (pas d'attente de mois 2).",
+      "Binôme social distinct du binôme technique, pour créer un lien hors production.",
+      "Feedback superviseur sur le ressenti d'intégration, pas seulement sur la performance.",
+    ],
+  },
+  decalage: {
+    label: "Décalage attentes / réalité du poste",
+    outil: "Clarification explicite du poste dès l'entretien, pas seulement à l'arrivée.",
+    actions: [
+      "Entretien de cadrage à J15 : le poste correspond-il à ce qui était annoncé ?",
+      "Ajustement rapide des missions si l'écart est identifié tôt, plutôt que de laisser dériver.",
+      "Transparence sur la trajectoire d'évolution possible, pour redonner du sens.",
+    ],
+  },
+  perspective: {
+    label: "Absence de perspective perçue",
+    outil: "Points d'étape à J30/J60/J90, avec projection concrète au-delà de la période d'essai.",
+    actions: [
+      "Point d'étape formel à J30, J60, J90 — pas seulement l'entretien de fin de période d'essai.",
+      "Reconnaissance rapide des premiers succès, pour ancrer le sentiment d'utilité.",
+      "Discussion explicite sur les perspectives d'évolution, même à ce stade précoce.",
+    ],
+  },
+};
 
 const DISC_CAUSES = {
   retards: {
@@ -257,7 +296,26 @@ function themeLabel(theme) {
   if (theme === "dmt") return "Maîtrise de la DMT";
   if (theme === "commerce") return "Développement commercial";
   if (theme === "disc") return "Registre disciplinaire orienté solution";
+  if (theme === "fid") return "Fidélisation orientée solution";
   return theme;
+}
+
+function buildFidelisation(nom, causeKey) {
+  const cause = FID_CAUSES[causeKey];
+  const dateEcheance = addWeeks(6);
+  return {
+    id: uid(),
+    theme: "fid",
+    nom,
+    createdAt: new Date().toISOString(),
+    status: "en cours",
+    causeLabel: cause.label,
+    indicateurEcart: `Risque de départ précoce identifié — cause principale : ${cause.label.toLowerCase()}. Constat de référence : rétention à 6 mois autour de 50 %, ambition de la dépasser durablement.`,
+    actionsFactuelles: cause.actions,
+    commentaire: `${cause.outil} Impact individuel : montée en compétence et projection dans le poste. Impact collectif : moins de recrutements à refaire, équipe plus stable.`,
+    suiviSmart: `Spécifique : sécuriser la présence du conseiller au-delà de 6 mois en traitant « ${cause.label.toLowerCase()} ». Mesurable : points d'étape à J30, J60, J90. Atteignable : actions ci-dessus, sans charge supplémentaire hors accompagnement. Réaliste : concentré sur la période à risque (6 premiers mois). Temporel : point de suivi au ${dateEcheance}.`,
+    felicitation: "Cap des 6 mois franchi : le conseiller passe en suivi standard, et son parcours d'intégration devient un exemple à partager avec les nouveaux arrivants.",
+  };
 }
 
 function paaToText(p) {
@@ -318,6 +376,10 @@ export default function AssistantConseillers() {
   const [discNom, setDiscNom] = useState("");
   const [discCause, setDiscCause] = useState("retards");
   const [discMesure, setDiscMesure] = useState("Aucune");
+
+  // Fidélisation form state
+  const [fidNom, setFidNom] = useState("");
+  const [fidCause, setFidCause] = useState("onboarding");
 
   const [syncError, setSyncError] = useState(false);
 
@@ -428,6 +490,18 @@ export default function AssistantConseillers() {
     showToast("Plan de développement généré et enregistré.");
   }
 
+  function handleFidSubmit(e) {
+    e.preventDefault();
+    if (!fidNom.trim()) {
+      showToast("Renseigne le nom du conseiller.");
+      return;
+    }
+    const entry = buildFidelisation(fidNom.trim(), fidCause);
+    persist([entry, ...history]);
+    setFidNom("");
+    showToast("Plan de fidélisation généré et enregistré.");
+  }
+
   function markAtteint(id) {
     const next = history.map((p) =>
       p.id === id ? { ...p, status: "atteint", atteintAt: new Date().toISOString() } : p
@@ -511,7 +585,8 @@ export default function AssistantConseillers() {
     }
   }
 
-  const causes = tab === "dmt" ? DMT_CAUSES : tab === "commerce" ? COM_CAUSES : DISC_CAUSES;
+  const causes =
+    tab === "dmt" ? DMT_CAUSES : tab === "commerce" ? COM_CAUSES : tab === "disc" ? DISC_CAUSES : FID_CAUSES;
 
   return (
     <div className="min-h-screen" style={{ background: PAPER, fontFamily: "Arial, sans-serif" }}>
@@ -593,6 +668,17 @@ export default function AssistantConseillers() {
             }}
           >
             <ClipboardList size={16} /> Registre disciplinaire
+          </button>
+          <button
+            onClick={() => setTab("fid")}
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition"
+            style={{
+              background: tab === "fid" ? VIOLET : "white",
+              color: tab === "fid" ? "white" : VIOLET,
+              border: `1px solid ${VIOLET}`,
+            }}
+          >
+            <Heart size={16} /> Fidélisation
           </button>
         </div>
 
@@ -706,7 +792,7 @@ export default function AssistantConseillers() {
                 </button>
               </div>
             </form>
-          ) : (
+          ) : tab === "disc" ? (
             <form onSubmit={handleDiscSubmit} className="grid sm:grid-cols-2 gap-4">
               <Field label="Conseiller">
                 <input
@@ -753,26 +839,81 @@ export default function AssistantConseillers() {
                 </button>
               </div>
             </form>
+          ) : (
+            <form onSubmit={handleFidSubmit} className="grid sm:grid-cols-2 gap-4">
+              <Field label="Conseiller">
+                <input
+                  className={inputCls}
+                  style={{ borderColor: "#D8E0F0" }}
+                  placeholder="Nom du conseiller"
+                  value={fidNom}
+                  onChange={(e) => setFidNom(e.target.value)}
+                />
+              </Field>
+              <Field label="Cause du risque de départ">
+                <select
+                  className={selectCls}
+                  style={{ borderColor: "#D8E0F0" }}
+                  value={fidCause}
+                  onChange={(e) => setFidCause(e.target.value)}
+                >
+                  {Object.entries(FID_CAUSES).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold text-white transition hover:opacity-90"
+                  style={{ background: VIOLET }}
+                >
+                  <Sparkles size={16} /> Générer le plan de fidélisation
+                </button>
+              </div>
+            </form>
           )}
         </div>
 
         {/* Cause bank preview */}
         <div className="mb-8">
           <h2 className="text-xs font-semibold tracking-wide uppercase mb-2" style={{ color: SKY }}>
-            Banque de techniques — {tab === "dmt" ? "DMT" : tab === "commerce" ? "Commerce" : "Registre disciplinaire"}
+            Banque de techniques —{" "}
+            {tab === "dmt"
+              ? "DMT"
+              : tab === "commerce"
+              ? "Commerce"
+              : tab === "disc"
+              ? "Registre disciplinaire"
+              : "Fidélisation"}
           </h2>
           <p className="text-xs mb-2" style={{ color: SKY }}>
             Clique une carte pour sélectionner cette cause dans le formulaire ci-dessus.
           </p>
           <div className="grid sm:grid-cols-3 gap-3">
             {Object.entries(causes).map(([k, v]) => {
-              const active = tab === "dmt" ? dmtCause === k : tab === "commerce" ? comCause === k : discCause === k;
+              const active =
+                tab === "dmt"
+                  ? dmtCause === k
+                  : tab === "commerce"
+                  ? comCause === k
+                  : tab === "disc"
+                  ? discCause === k
+                  : fidCause === k;
               return (
                 <button
                   key={k}
                   type="button"
                   onClick={() =>
-                    tab === "dmt" ? setDmtCause(k) : tab === "commerce" ? setComCause(k) : setDiscCause(k)
+                    tab === "dmt"
+                      ? setDmtCause(k)
+                      : tab === "commerce"
+                      ? setComCause(k)
+                      : tab === "disc"
+                      ? setDiscCause(k)
+                      : setFidCause(k)
                   }
                   className="text-left rounded-lg border p-3 bg-white transition hover:shadow-md cursor-pointer"
                   style={{
@@ -981,6 +1122,8 @@ export default function AssistantConseillers() {
                     <span className="text-xs" style={{ color: SKY }}>
                       {p.theme === "disc"
                         ? `· ${p.causeLabel} — ${p.mesureFormelle}`
+                        : p.theme === "fid"
+                        ? `· ${p.causeLabel}`
                         : `· ${p.metricLabel} ${p.actuel} → cible ${p.cible}`}
                     </span>
                   </div>
