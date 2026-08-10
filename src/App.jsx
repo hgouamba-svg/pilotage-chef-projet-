@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { PhoneCall, TrendingUp, CheckCircle2, AlertTriangle, Copy, Trash2, Sparkles, ChevronRight, Download, ClipboardList, Heart, LogOut, Users, UserPlus, X } from "lucide-react";
+import { PhoneCall, TrendingUp, CheckCircle2, AlertTriangle, Copy, Trash2, Sparkles, ChevronRight, Download, ClipboardList, Heart, LogOut, Users, UserPlus, X, KeyRound } from "lucide-react";
 
 // ---- Palette (aligned with the "Piloter une activité de 50 ETP" deck) ----
 const NAVY = "#173A6B";
@@ -1873,6 +1873,26 @@ function UserManagementModal({ token, onClose, showToast }) {
     }
   }
 
+  async function handleResetPassword(id) {
+    const newPassword = window.prompt("Nouveau mot de passe pour ce compte (6 caractères minimum) :");
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      showToast("Mot de passe trop court (6 caractères minimum).");
+      return;
+    }
+    try {
+      const res = await fetch("/api/users", {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ id, newPassword }),
+      });
+      if (!res.ok) throw new Error("failed");
+      showToast("Mot de passe réinitialisé.");
+    } catch (e) {
+      showToast("Réinitialisation impossible.");
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(23,58,107,0.55)" }}>
       <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6">
@@ -1936,9 +1956,19 @@ function UserManagementModal({ token, onClose, showToast }) {
                     · {u.username} · {u.role === "admin" ? "Administrateur" : equipeLabel(u.equipe)}
                   </span>
                 </div>
-                <button onClick={() => handleDelete(u.id)} className="p-1.5 rounded-full transition hover:opacity-70" style={{ color: "#C0576B" }}>
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleResetPassword(u.id)}
+                    className="p-1.5 rounded-full transition hover:opacity-70"
+                    style={{ color: VIOLET }}
+                    title="Réinitialiser le mot de passe"
+                  >
+                    <KeyRound size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(u.id)} className="p-1.5 rounded-full transition hover:opacity-70" style={{ color: "#C0576B" }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
